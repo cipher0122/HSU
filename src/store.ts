@@ -1,148 +1,126 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Project, BoardColumn, Task, User, Attachment } from './types';
+import { api } from './api';
 import { v4 as uuidv4 } from 'uuid';
 
-const INITIAL_USERS: User[] = [
+const FALLBACK_USERS: User[] = [
   { id: 'u1', email: 'alice@example.com', name: 'Alice (PM)', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alice' },
   { id: 'u2', email: 'bob@example.com', name: 'Bob (Engineer)', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Bob' },
   { id: 'u3', email: 'charlie@example.com', name: 'Charlie (Client)', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Charlie' },
 ];
 
-const INITIAL_PROJECTS: Project[] = [
+const FALLBACK_PROJECTS: Project[] = [
   { id: 'p1', name: '企業 ERP 升級專案', key_code: 'ERP', created_at: new Date().toISOString() },
 ];
 
-const INITIAL_COLUMNS: BoardColumn[] = [
-  { id: 'c1', project_id: 'p1', title: 'To Do', position: 1000, wip_limit: 0 },
-  { id: 'c2', project_id: 'p1', title: 'In Progress', position: 2000, wip_limit: 3 },
-  { id: 'c3', project_id: 'p1', title: 'Under Review', position: 3000, wip_limit: 0 },
-  { id: 'c4', project_id: 'p1', title: 'Done', position: 4000, wip_limit: 0 },
-];
-
-const today = new Date();
-const todayStr = today.toISOString();
-const nextWeekStr = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
-const nextTwoWeeksStr = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString();
-const prevWeekStr = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-
-const INITIAL_TASKS: Task[] = [
-  {
-    id: 't1',
-    project_id: 'p1',
-    column_id: 'c1',
-    task_type: 'TASK',
-    title: '資料庫 Schema 設計',
-    description: '請依照規格書建立實體關聯圖。',
-    status: 'OPEN',
-    priority: 'HIGH',
-    position: 1000,
-    start_date: todayStr,
-    due_date: nextWeekStr,
-    creator_id: 'u1',
-    assignee_ids: ['u2'],
-    created_at: todayStr,
-    updated_at: todayStr,
-  },
-  {
-    id: 't2',
-    project_id: 'p1',
-    column_id: 'c2',
-    task_type: 'RFI',
-    rfi_code: 'RFI-2026-001',
-    title: '確認登入驗證 API 規格',
-    description: '前端需要確認 SSO 登入的跳轉流程與 Token 格式。',
-    status: 'IN_REVIEW',
-    priority: 'URGENT',
-    position: 2000,
-    start_date: prevWeekStr,
-    due_date: todayStr,
-    creator_id: 'u2',
-    assignee_ids: ['u1', 'u3'],
-    created_at: prevWeekStr,
-    updated_at: todayStr,
-  },
-  {
-    id: 't3',
-    project_id: 'p1',
-    column_id: 'c1',
-    task_type: 'TASK',
-    title: '實作看板拖曳功能',
-    description: '使用 dnd-kit 實作拖曳排序',
-    status: 'OPEN',
-    priority: 'MEDIUM',
-    position: 3000,
-    start_date: nextWeekStr,
-    due_date: nextTwoWeeksStr,
-    creator_id: 'u2',
-    assignee_ids: ['u2'],
-    created_at: todayStr,
-    updated_at: todayStr,
-  }
-];
-
 export function useStore() {
-  const [users] = useState<User[]>(INITIAL_USERS);
-  const [currentUser, setCurrentUser] = useState<User>(INITIAL_USERS[0]);
-  const [projects] = useState<Project[]>(INITIAL_PROJECTS);
-  
-  const [columns, setColumns] = useState<BoardColumn[]>(() => {
-    const saved = localStorage.getItem('app_columns');
-    return saved ? JSON.parse(saved) : INITIAL_COLUMNS;
-  });
+  const [users, setUsers] = useState<User[]>(FALLBACK_USERS);
+  const [currentUser, setCurrentUser] = useState<User>(FALLBACK_USERS[0]);
+  const [projects, setProjects] = useState<Project[]>(FALLBACK_PROJECTS);
+  const [columns, setColumns] = useState<BoardColumn[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    const saved = localStorage.getItem('app_tasks');
-    return saved ? JSON.parse(saved) : INITIAL_TASKS;
-  });
+  // 初始化向後端載入資料
+  const loadData = useCallback(async () => {
+    try {
+      const [u, p, c, t, a] = await Promise.all([
+        api.getUsers(),
+        api.getProjects(),
+        api.getColumns(),
+        api.getTasks(),
+        api.getAttachments(),
+      ]);
 
-  const [attachments, setAttachments] = useState<Attachment[]>(() => {
-    const saved = localStorage.getItem('app_attachments');
-    return saved ? JSON.parse(saved) : [];
-  });
+      if (u.length > 0) {
+        setUsers(u);
+        setCurrentUser(prev => u.find(user => user.id === prev.id) || u[0]);
+      }
+      if (p.length > 0) setProjects(p);
+      setColumns(c);
+      setTasks(t);
+      setAttachments(a);
+    } catch (err) {
+      console.error('Failed to load data from SQLite backend, using local state:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem('app_columns', JSON.stringify(columns));
-  }, [columns]);
+    loadData();
+  }, [loadData]);
 
-  useEffect(() => {
-    localStorage.setItem('app_tasks', JSON.stringify(tasks));
-  }, [tasks]);
-
-  useEffect(() => {
-    localStorage.setItem('app_attachments', JSON.stringify(attachments));
-  }, [attachments]);
-
-  const moveTask = (taskId: string, targetColumnId: string, newPosition: number) => {
+  // 移動任務（樂觀更新 + 同步後端）
+  const moveTask = async (taskId: string, targetColumnId: string, newPosition: number) => {
+    const updatedAt = new Date().toISOString();
     setTasks(prev => prev.map(t => 
       t.id === taskId 
-        ? { ...t, column_id: targetColumnId, position: newPosition, updated_at: new Date().toISOString() } 
+        ? { ...t, column_id: targetColumnId, position: newPosition, updated_at: updatedAt } 
         : t
     ));
+
+    try {
+      await api.updateTask(taskId, {
+        column_id: targetColumnId,
+        position: newPosition,
+      });
+    } catch (err) {
+      console.error('Failed to persist task move:', err);
+    }
   };
 
-  const addTask = (task: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => {
+  // 新增任務
+  const addTask = async (taskData: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => {
+    const now = new Date().toISOString();
     const newTask: Task = {
-      ...task,
+      ...taskData,
       id: uuidv4(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      created_at: now,
+      updated_at: now,
     };
+
+    // 樂觀更新
     setTasks(prev => [...prev, newTask]);
+
+    try {
+      await api.createTask(newTask);
+    } catch (err) {
+      console.error('Failed to persist new task:', err);
+    }
   };
 
-  const updateTask = (taskId: string, updates: Partial<Omit<Task, 'id' | 'created_at'>>) => {
+  // 更新任務
+  const updateTask = async (taskId: string, updates: Partial<Omit<Task, 'id' | 'created_at'>>) => {
+    const now = new Date().toISOString();
     setTasks(prev => prev.map(t => 
-      t.id === taskId ? { ...t, ...updates, updated_at: new Date().toISOString() } : t
+      t.id === taskId ? { ...t, ...updates, updated_at: now } : t
     ));
+
+    try {
+      await api.updateTask(taskId, updates);
+    } catch (err) {
+      console.error('Failed to persist task update:', err);
+    }
   };
 
-  const addAttachment = (attachment: Omit<Attachment, 'id' | 'created_at'>) => {
+  // 新增附件
+  const addAttachment = async (attachmentData: Omit<Attachment, 'id' | 'created_at'>) => {
     const newAttachment: Attachment = {
-      ...attachment,
+      ...attachmentData,
       id: uuidv4(),
       created_at: new Date().toISOString(),
     };
+
     setAttachments(prev => [...prev, newAttachment]);
+
+    try {
+      await api.createAttachment(newAttachment);
+    } catch (err) {
+      console.error('Failed to persist attachment:', err);
+    }
+
     return newAttachment;
   };
 
@@ -154,9 +132,11 @@ export function useStore() {
     columns,
     tasks,
     attachments,
+    isLoading,
     moveTask,
     addTask,
     updateTask,
-    addAttachment
+    addAttachment,
+    refresh: loadData,
   };
 }
