@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", sans-serif;
+  --color-bauhaus-bg: #F0F0F0;
+  --color-bauhaus-fg: #121212;
+  --color-bauhaus-red: #D02020;
+  --color-bauhaus-blue: #1040C0;
+  --color-bauhaus-yellow: #F0C020;
+  --shadow-bauhaus-sm: 2px 2px 0px 0px #121212;
+  --shadow-bauhaus: 4px 4px 0px 0px #121212;
+  --shadow-bauhaus-lg: 8px 8px 0px 0px #121212;
+}
+
+body {
+  background-color: var(--color-bauhaus-bg);
+  color: var(--color-bauhaus-fg);
+  font-family: var(--font-sans);
+  /* Apply pattern background */
+  background-image: radial-gradient(#d0d0d0 2px, transparent 2px);
+  background-size: 24px 24px;
+}
+
+.bauhaus-btn {
+  @apply bg-white border-2 border-[#121212] shadow-bauhaus active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all font-bold uppercase tracking-wider text-[#121212] flex items-center justify-center rounded-none cursor-pointer;
+}
+
+.bauhaus-card {
+  @apply bg-white border-4 border-[#121212] shadow-bauhaus-lg hover:-translate-y-[2px] transition-transform rounded-none;
+}
+
+.bauhaus-input {
+  @apply border-2 border-[#121212] shadow-bauhaus focus:translate-x-[2px] focus:translate-y-[2px] focus:shadow-none transition-all outline-none rounded-none text-[#121212] bg-white;
+}
+
+.shape-triangle {
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+}

@@ -1,0 +1,8 @@
+{
+  "name": "專案與 RFI 追蹤系統",
+  "description": "結合敏捷看板 (Kanban) 與需求資訊澄清 (RFI) 的專案管理追蹤平台。",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
